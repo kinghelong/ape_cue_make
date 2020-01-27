@@ -1,0 +1,236 @@
+#include"framework.h"
+//参数为数据，采样个数
+//返回值为分贝
+//#define VOLUMEMAX   32767
+
+//const int8_t permutation[33] = { 0,1,2,3,4,4,5,5,5,5,6,6,6,6,6,7,7,7,7,8,8,8,9,9,9,9,9,9,9,9,9,9,9 };
+
+//const int METER_FREQUENCY[] = { 30, 60, 100, 160, 240, 300, 350, 400, 440, 500, 600, 800, 1000, 1500, 2000, 2600, 3000, 4000, 6000, 8000, 10000, 14000, 16000,18000,20000,24000 };
+//const int NUM_FREQUENCY = sizeof(METER_FREQUENCY) / sizeof(int);
+//const double FFT_SPEED = 0.06;
+//static const float kMaxSquaredLevel = 32768 * 32768;
+//constexpr float kMinLevel = 30.f;
+
+
+/*
+int SimpleCalculate_DB(short* pcmData, int sample)
+{
+	signed short ret = 0;
+	if (sample > 0) {
+		int sum = 0;
+		signed short* pos = (signed short *)pcmData;
+		for (int i = 0; i < sample; i++) {
+			sum += abs(*pos);
+			pos++;
+		}
+		ret = sum * 500.0 / (sample * VOLUMEMAX);
+		if (ret >= 100) {
+			ret = 100;
+		}
+	}
+	return ret;
+}
+*/
+
+/*
+void Process(const int16_t* data, size_t length)
+{
+	int rms=0;
+	float sum_square_ = 0;
+	size_t sample_count_ = 0;
+	for (size_t i = 0; i < length; ++i) {
+		sum_square_ += data[i] * data[i];
+	}
+	sample_count_ += length;
+	//float rms = sum_square_ / (sample_count_ * kMaxSquaredLevel);
+	//20log_10(x^0.5) = 10log_10(x)
+	rms = 10 * log10(rms);
+	if (rms < -kMinLevel)
+		rms = -kMinLevel;
+	rms = -rms;
+	 static_cast<int>(rms + 0.5);
+}
+
+
+*/
+/*
+int16_t WebRtcSpl_MaxAbsValueW16C(const int16_t* vector, size_t length)
+{
+	size_t i = 0;
+	int absolute = 0, maximum = 0;
+	for (i = 0; i < length; i++) {
+		absolute = abs((int)vector[i]);
+		if (absolute > maximum) {
+			maximum = absolute;
+		}
+	}
+	if (maximum > 32767) {
+		maximum = 32767;
+	}
+	return (int16_t)maximum;
+}
+*/
+/*
+void ComputeLevel(const int16_t* data, size_t length)
+{
+	int16_t _absMax = 0;
+	int16_t _count = 0;
+	int8_t _currentLevel = 0;
+	int16_t absValue(0);
+	absValue = WebRtcSpl_MaxAbsValueW16(data, length);
+	if (absValue > _absMax)
+		_absMax = absValue;
+	if (_count++ == 10) {
+		_count = 0;
+		int32_t position = _absMax / 1000;
+		if ((position == 0) && (_absMax > 250)) {
+			position = 1;
+		}
+		_currentLevel = permutation[position];
+		_absMax >>= 2;
+	}
+
+	//计算缓冲区大小
+	m_nBufferSize = FFT::NextPowerOfTwo(static_cast<size_t>(fmt.nAvgBytesPerSec * FFT_SPEED));
+	//计算每个声道所占的数据量大小
+	m_nNumSamples = m_nBufferSize / fmt.nBlockAlign;
+
+	m_ReadBuf = new unsigned char[m_nBufferSize];//计算每次读取的数据大小
+
+	m_RealIn_RT.resize(m_nNumSamples);
+	m_RealIn_LT.resize(m_nNumSamples);
+	m_RealOut.resize(m_nNumSamples);
+	m_ImagOut.resize(m_nNumSamples);
+	m_Ampl.resize(m_nNumSamples);
+	m_MeterData.resize(NUM_FREQUENCY);
+
+	int m_Tim = data.WdSize / m_nBufferSize;
+
+	for (int i = 0; i < m_Tim; i++)
+	{
+		memset(m_ReadBuf, 0, m_nBufferSize);
+		memcpy(m_ReadBuf, data.Wdbuf + i * m_nBufferSize, m_nBufferSize);
+		if (GetAudioData(m_ReadBuf, m_nBufferSize, fmt))//取数据
+		{
+			//进行FFT计算
+			FFT::Compute<float>(m_nNumSamples, &m_RealIn_RT[0], NULL, &m_RealOut[0], &m_ImagOut[0]);
+			size_t index = 0;
+			// 跳过一半的镜像数据
+			FFT::Norm<float>(m_nNumSamples / 2, &m_RealOut[0], &m_ImagOut[0], &m_Ampl[0]);  //复数模 - 为幅值
+
+			double maxAmpl = (fmt.wBitsPerSample == 8) ? (127.0*127.0) : (32767.0*32767.0);	 //可以表示的幅值范围 
+
+
+			int centerFreq = static_cast<int>(fmt.nSamplesPerSec / 2);//类型转换为int	 采样频率是实际样本的两倍
+			for (int i = 0; i < NUM_FREQUENCY; ++i)
+			{
+				if (METER_FREQUENCY[i] > centerFreq)//频率大于样本频率
+					m_MeterData[i] = 0;
+				else
+				{	// 假设采样频率为Fs，采样点数为N，做FFT之后，某一点n（n从1开始）表示的频率为：Fn=(n-1)*Fs/N；
+					int indice = static_cast<int>(METER_FREQUENCY[i] * m_nNumSamples / fmt.nSamplesPerSec);//计算该频率的下标
+					int value = static_cast<int>(20.0*log10(m_Ampl[indice] / maxAmpl));  //求分贝值		 //用方根计算能量值 20log10(幅值/幅值范围)
+					m_MeterData[i] = value;
+				}
+			}
+			//取分贝数据范围0-100
+			SetData(&m_MeterData[0], NUM_FREQUENCY);
+			//显示分贝数据到图谱
+			//updatechart(true, false);
+			m_nNumSamples = 0;
+			Sleep(100);
+		}
+	}
+}
+*/
+//计算完成后的分贝值还需进行取值操作，范围限定于0-100之间。
+//如此计算完成后的分贝值存放于m_data 中，即可采用chartdirector进行绘制显示。也可以自己绘制。
+/*
+bool  SetData(const int ArrayValue[], int nSize)
+{
+	float *m_data =  new float[nSize];
+	if (ArrayValue == NULL)
+		return false;
+	memset(m_data, 0, sizeof(double));
+	int Value = 0;
+		for (int i = 0; i < nSize; i++)
+		{
+			Value = __min(ArrayValue[i], 100);//取0-100 之间得数
+
+			Value = __max(Value, 0);
+			m_data[i] = Value;
+		}
+		delete m_data;
+	return true;
+}
+*/
+/*
+bool  GetAudioData(const unsigned char* pbData, unsigned int cbSize, const WAVE_FORMAT& wfmt)//处理音频数据
+{
+	bool samplesReady = false;
+	float *m_RealIn_RT = new float[cbSize];
+	float *m_RealIn_LT = new float[cbSize];
+	unsigned int m_nNumSamples;
+	switch (wfmt.wBitsPerSample)	 //采样精度
+	{
+	case 8:							   //8位取样精度 无符号 0-255 实际范围应为-127~128
+	{
+		if (wfmt.nChannels == 1) // 单声道
+		{
+			for (size_t i = 0; i < cbSize; ++i)
+			{
+				m_RealIn_RT[i] = static_cast<float>((pbData[i] - 128) << 6);// Out = (In-128)*64
+				m_RealIn_LT[i] = m_RealIn_RT[i];
+			}
+			m_nNumSamples = cbSize;
+		}
+		else if (wfmt.nChannels == 2) // 立体声道	有左右两个声道
+		{
+			size_t Samples = cbSize >> 1; //除以2
+			for (size_t i = 0, j = 0; i < Samples; ++i, j += 2)
+			{
+				m_RealIn_RT[i] = static_cast<float>((pbData[j] - 128) << 6); // Out = (In-128)*64
+				m_RealIn_LT[i] = static_cast<float>((pbData[j + 1] - 128) << 6); // Out = (In-128)*64
+			}
+			m_nNumSamples = Samples;
+		}
+		samplesReady = (m_nNumSamples != 0);
+	}
+	break;
+	case 16:
+	{
+		const short *pfData = reinterpret_cast<const short*>(pbData);  //指针类型转换 把 char 转为 short
+		if (wfmt.nChannels == 1) //仅有一个声道
+		{
+			size_t Samples = cbSize >> 1;  //除以2
+			for (size_t i = 0; i < Samples; ++i)
+			{
+				m_RealIn_RT[i] = static_cast<float>(pfData[i]);
+				m_RealIn_LT[i] = m_RealIn_RT[i];
+			}
+			m_nNumSamples = Samples;
+		}
+		else if (wfmt.nChannels == 2) // stereo  //立体声道 有左右两个通道
+		{
+			size_t Samples = cbSize >> 2; //除以4
+			for (size_t i = 0, j = 0; i < Samples; ++i, j += 2)
+			{
+				m_RealIn_RT[i] = static_cast<float>(pfData[j]);
+				m_RealIn_LT[i] = static_cast<float>(pfData[j + 1]);
+			}
+			m_nNumSamples = Samples;
+		}
+		samplesReady = (m_nNumSamples != 0);
+	}
+	break;
+	default:
+		assert(false); // not supported
+		break;
+	}
+	delete []m_RealIn_RT;
+	delete []m_RealIn_LT;
+	return samplesReady;
+
+}
+
+*/

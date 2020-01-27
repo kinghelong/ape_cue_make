@@ -1,0 +1,9 @@
+﻿C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\Common7\IDE\VC\VCTargets\Platforms\Win32\PlatformToolsets\v141_xp\Toolset.targets(39,5): warning MSB8051: 面向 Windows XP 的支持已被弃用，将来的 Visual Studio 版本不再提供该支持。请访问 https://go.microsoft.com/fwlink/?linkid=2023588，获取详细信息。
+  cue_ape.cpp
+  No platform set for MACLib, defaulting to Windows
+c:\users\llk\source\repos\cue_ape\cue_ape\cue_ape.cpp(155): warning C4101: “KL”: 未引用的局部变量
+c:\users\llk\source\repos\cue_ape\cue_ape\cue_ape.cpp(584): warning C4172: 返回局部变量或临时变量的地址: szBuffer
+c:\users\llk\source\repos\cue_ape\cue_ape\cue_ape.cpp(565): warning C4172: 返回局部变量或临时变量的地址: music_info
+c:\users\llk\source\repos\cue_ape\cue_ape\cue_ape.cpp(605): warning C4172: 返回局部变量或临时变量的地址: szBuffer
+c:\users\llk\source\repos\cue_ape\cue_ape\cue_ape.cpp(988): warning C4172: 返回局部变量或临时变量的地址: szAnsi
+  cue_ape.vcxproj -> C:\Users\llk\source\repos\cue_ape\Debug\cue_ape.exe
