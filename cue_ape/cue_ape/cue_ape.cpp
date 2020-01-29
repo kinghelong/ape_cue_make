@@ -159,8 +159,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					lstrcpy(CUE_NAME, F);
 				//	GetCurrentDirectoryW(200, CUE_NAME);//获得当前文件的目录名
 				//	GetShortPathNameW(CUE_NAME, KL, 255);//路径缩减形式
-					ShellExecuteW(NULL,L"open", L"notepad.exe", CUE_NAME,  NULL, SW_SHOW);
-					//DialogBox(hInst, MAKEINTRESOURCE(IDD_ALBUM), hWnd, Album);
+					//ShellExecuteW(NULL,L"open", L"notepad.exe", CUE_NAME,  NULL, SW_SHOW);
+					DialogBox(hInst, MAKEINTRESOURCE(IDD_ALBUM), hWnd, Album);
 				}
 			}
 				break;
@@ -516,27 +516,37 @@ TIME_STRUCT  *cue_time(HWND hWnd,TCHAR *fileName)
 			//db = (int)(20.0*log10(dou_sum));
 			DB_mul = 20 * log10(dou_sum / 32767);
 		}
-		if (DB_mul < -45)
+		//if (i > 174106800)
+	//		MessageBox(hWnd, L"第二段", L"D", MB_OK);
+		BOOL act = false;
+		if ((DB_mul < -55) || (sum<100))//前置零区不计，因为dou_sum=0。这是第一个小于-55分贝的样本
 		{
-			low_count++;
-			if (low_count == 1)
+			act = true;
+			low_count++;//低分贝计数
+			if (low_count == 1)//如果是第一个低分贝，则把值赋给ok，用于计算下一个低分贝值是不是连续性
 			{
-				ok = i;
+				ok = i;//由于是4096个字节取一个平均值，ok也是4096整数倍。
 			}
 			else
 			{
 				judge = i - ok;
-				if (judge > 4096)//101077200第二段
+				if (judge > 4096)//判断是不是连续低分贝区域
 				{
-					if (low_count > 140)
+					if (low_count > 70)
 					{
-						val++;
+						val++;//静音区号
 						ok = (i - low_count * 2048) / ONE_SECOND_DATA;
 						minute = ok / 60;
 						second = ok % 60;
-						swprintf_s(report, 1255, L"第%d段静音区%d分%d秒\r\n", val, minute, second + 2);
-						ten = lstrlenW(report);
-						WriteFile(hTxt, report, ten * 2, &num, NULL);
+						if ((second + 2) > 60)
+						{
+							second = second - 59;
+							minute++;
+						}
+							swprintf_s(report, 1255, L"第%d段静音区%d分%d秒\r\n", val, minute, second );
+							ten = lstrlenW(report);
+							WriteFile(hTxt, report, ten * 2, &num, NULL);
+						
 					}
 					low_count = 0;
 				}
@@ -544,17 +554,19 @@ TIME_STRUCT  *cue_time(HWND hWnd,TCHAR *fileName)
 					ok = i;
 			}
 		}
-		else if (low_count > 140)
+		else if (low_count > 70)
 		{
 			time[val] = ok;
 			val++;
 			ok = (i - low_count * 2048) / ONE_SECOND_DATA;
 			minute = ok / 60;
 			second = ok % 60;
-			swprintf_s(report, 1255, L"第%d段静音区%d分%d秒\r\n", val, minute, second);
-			ten = lstrlenW(report);
-			WriteFile(hTxt, report, ten * 2, &num, NULL);
-			low_count = 0;
+			
+				swprintf_s(report, 1255, L"第%d段静音区%d分%d秒\r\n", val, minute, second);
+				ten = lstrlenW(report);
+				WriteFile(hTxt, report, ten * 2, &num, NULL);
+				low_count = 0;
+			
 		}
 
 	}
@@ -653,6 +665,7 @@ INT_PTR CALLBACK Album(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			int a = GetDlgItemTextW(hDlg, IDC_EDIT4, Artist, 255);//我操，竟然需要填父窗口句柄			
 			pos = (int)SendMessage(hList, LB_ADDSTRING, 0,(LPARAM)Artist);//获得列表项索引
 			SetDlgItemInt(hDlg, IDC_EDIT3, pos + 1, TRUE);//曲目号
+			SetDlgItemTextW(hDlg, IDC_EDIT4, NULL);
 		}
 		break;
 		case IDC_EMPTY:
@@ -686,7 +699,8 @@ INT_PTR CALLBACK Album(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				TCHAR * textBuffer = new TCHAR[textLen + 1];
 				SendMessage(hList, LB_GETTEXT, (WPARAM)itemIndex, (LPARAM)textBuffer);
 				SetDlgItemInt(hDlg, IDC_EDIT3, itemIndex + 1, TRUE);
-				MessageBox(NULL, textBuffer, _T("Selected Text from Listbox:"), MB_OK);				
+			//	MessageBox(NULL, textBuffer, _T("Selected Text from Listbox:"), MB_OK);				
+				SetDlgItemTextW(hDlg, IDC_EDIT4, textBuffer);
 				delete[] textBuffer;
 				textBuffer = NULL;
 				return TRUE;
@@ -852,8 +866,8 @@ VOID SetOwner(HWND hWnd)
 
 BOOL cue_txt_make(int *time, TCHAR **music, TCHAR *artist, TCHAR *album, TCHAR *fileName, int soundNum)
 {
-	TCHAR   CUE[2048] = L"PERFORMER \"", temp[255], apeName[255],cueName[255];
-	HANDLE  hFile;
+	TCHAR   CUE[2048] = L"PERFORMER \"", temp[255], apeName[255],cueName[255],songName[1024];
+	HANDLE  hFile,hTxt;
 	DWORD LastError;
 	HANDLE hHeap;
 	TCHAR *ItemData;
@@ -863,12 +877,16 @@ BOOL cue_txt_make(int *time, TCHAR **music, TCHAR *artist, TCHAR *album, TCHAR *
 	DWORD num = 0;
 	
 	lstrcpynW(temp, fileName, lstrlenW(fileName) - 3);
+	lstrcpyW(songName, temp);
+	lstrcatW(songName, L"--歌曲名");
+	lstrcatW(songName, L".txt");
 	lstrcatW(temp, L".cue");
 	lstrcpy(cueName, temp);
+	hTxt = CreateFile(songName, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	hFile = CreateFile(temp, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	
 
-	//WriteFile(hFile, &uni, 2, &num, NULL);//不需要UNICODE版
+	WriteFile(hTxt, &uni, 2, &num, NULL);//不需要UNICODE版
 	lstrcatW(CUE, artist);
 	lstrcatW(CUE, L"\"\r\n");//第一行艺术家
 	lstrcatW(CUE, L"TITLE \"");
@@ -908,7 +926,7 @@ BOOL cue_txt_make(int *time, TCHAR **music, TCHAR *artist, TCHAR *album, TCHAR *
 
 	for (int n = 0; n < soundNum ; n++)
 	{
-		
+		TCHAR par[1024] ;
 		time_con = *time / ONE_SECOND_DATA;
 		time_con -= 2;
 		ItemData = (TCHAR *)HeapAlloc(hHeap, HEAP_ZERO_MEMORY, 4096);
@@ -916,6 +934,10 @@ BOOL cue_txt_make(int *time, TCHAR **music, TCHAR *artist, TCHAR *album, TCHAR *
 		lstrcatW(ItemData, temp);//第一行轨道结束
 		lstrcatW(ItemData, L"     TITLE \"");//TITLE "
 		lstrcpyW(CUE, CueList[n]);           //CUE是歌曲名
+		lstrcpyW(par, CueList[n]);
+		lstrcatW(par, L"\r\n");
+		WriteFile(hTxt, par, lstrlenW(par) * 2 , &num, NULL);
+		//WriteFile(hTxt, par, 5, &num, NULL);
 		lstrcatW(ItemData, CUE);             //连接成TRACK N AUDIO \r\n TITLE "歌曲
 		lstrcatW(ItemData, L"\"\r\n");      //第二行歌曲，补上双引号
 		if (n > 0)
@@ -962,7 +984,9 @@ BOOL cue_txt_make(int *time, TCHAR **music, TCHAR *artist, TCHAR *album, TCHAR *
 		HeapFree(hHeap, HEAP_NO_SERIALIZE, NULL);
 		
 	}
+	
 	CloseHandle(hFile);
+	CloseHandle(hTxt);
 	ShellExecuteW(NULL, L"open", L"notepad.exe", cueName, NULL, SW_SHOW);
 	return TRUE;
 }
