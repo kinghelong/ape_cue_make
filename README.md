@@ -1,6 +1,6 @@
 # ape_cue_make
 ape_cue_make_vc2017
-为方便制作CUE文件
+为方便制作CUE文件而编的这个软件。
 解压APE文件并获得CUE文件，就是播放列表
 cue按钮是用来制作CUE文件的
 OPEN按钮是用来编辑CUE文件的
