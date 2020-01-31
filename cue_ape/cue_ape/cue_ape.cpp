@@ -572,6 +572,7 @@ TIME_STRUCT  *cue_time(HWND hWnd,TCHAR *fileName)
 	}
 	CloseHandle(hTxt);
 	CloseHandle(hFile);
+	DeleteFile(wav_name);
 	music_info.Array = time;
 	music_info.itemNum = val;
 	return &music_info;
